@@ -536,11 +536,7 @@ class Interface(Blocks):
                                 interpretation_btn = Button(
                                     "Interpret", variant="secondary"
                                 )
-            submit_fn = (
-                lambda *args: self.run_prediction(args)[0]
-                if len(self.output_components) == 1
-                else self.run_prediction(args)
-            )
+            submit_fn = self.submit_function
             if self.live:
                 for component in self.input_components:
                     component.change(
@@ -573,16 +569,16 @@ class Interface(Blocks):
                 ),
                 _js=f"""() => {json.dumps(
                     [component.cleared_value if hasattr(component, "cleared_value") else None
-                    for component in self.input_components + self.output_components] + (
-                            [True]
-                            if self.interface_type
-                            in [
-                                self.InterfaceTypes.STANDARD,
-                                self.InterfaceTypes.INPUT_ONLY,
-                                self.InterfaceTypes.UNIFIED,
-                            ]
-                            else []
-                        )
+                     for component in self.input_components + self.output_components] + (
+                        [True]
+                        if self.interface_type
+                           in [
+                               self.InterfaceTypes.STANDARD,
+                               self.InterfaceTypes.INPUT_ONLY,
+                               self.InterfaceTypes.UNIFIED,
+                           ]
+                        else []
+                    )
                     + ([False] if self.interpretation else [])
                 )}
                 """,
@@ -705,6 +701,24 @@ class Interface(Blocks):
             predictions.extend(prediction)
 
         return predictions
+
+    async def submit_function(self, *args):
+        """
+        Returns an async function in case run_prediction is an async function as well.
+        """
+        if len(self.output_components) == 1:
+            return (
+                self.run_prediction(args)[0]
+                if inspect.iscoroutinefunction(self.run_prediction)
+                else await self.run_prediction(args)[0]
+            )
+
+        else:
+            return (
+                self.run_prediction(args)
+                if inspect.iscoroutinefunction(self.run_prediction)
+                else await self.run_prediction(args)
+            )
 
     def process(self, raw_input: List[Any]) -> Tuple[List[Any], List[float]]:
         """
